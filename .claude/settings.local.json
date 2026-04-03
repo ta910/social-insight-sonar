@@ -14,7 +14,10 @@
       "Bash(python3 -c \"import sys, json; d=json.load\\(sys.stdin\\); print\\('deps:', json.dumps\\(d.get\\('dependencies', {}\\), indent=2\\)\\); print\\('peers:', json.dumps\\(d.get\\('peerDependencies', {}\\), indent=2\\)\\)\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('version:', d.get\\('version'\\)\\); print\\('main:', d.get\\('main'\\)\\); print\\('exports keys:', list\\(d.get\\('exports', {}\\).keys\\(\\)\\)[:10]\\)\")",
       "Bash(npm uninstall:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
