@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/supabase";
+
+export const dynamic = 'force-dynamic'
 import type { RawSource } from "@/lib/types";
 
 const anthropic = new Anthropic({
