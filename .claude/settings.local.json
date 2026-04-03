@@ -25,7 +25,8 @@
       "Bash(python3 -c ':*)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d['routes'].get\\('/_not-found','not in routes'\\)\\)\\)\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('/_global-error in routes:', '/_global-error' in d.get\\('routes',{}\\)\\)\")",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('/_global-error in staticRoutes:', any\\(r['page']=='/_global-error' for r in d.get\\('staticRoutes',[]\\)\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('/_global-error in staticRoutes:', any\\(r['page']=='/_global-error' for r in d.get\\('staticRoutes',[]\\)\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(k,'->',v\\) for k,v in d.items\\(\\) if 'global' in k]\")"
     ]
   }
 }
