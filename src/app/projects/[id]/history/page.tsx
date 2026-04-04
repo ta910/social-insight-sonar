@@ -127,7 +127,7 @@ export default function HistoryPage() {
                   {isOpen && (
                     <div className="px-6 pb-6 border-t border-slate-100">
                       <div className="pt-5">
-                        <ReportDisplay report={report} />
+                        <ReportDisplay report={report} periodLabel={report.period_type === "weekly" ? "週次" : report.period_type === "monthly" ? "月次" : "年次"} />
                       </div>
                     </div>
                   )}

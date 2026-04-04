@@ -13,13 +13,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "project_id は必須です" }, { status: 400 });
   }
 
-  // 全履歴取得
+  // 全履歴取得（period で絞り込み可）
   if (all === "true") {
-    const { data, error } = await supabase
+    let query = supabase
       .from("reports")
       .select("*")
       .eq("project_id", project_id)
-      .order("created_at", { ascending: false });
+      .order("period_start", { ascending: false });
+
+    if (period) {
+      query = query.eq("period_type", period);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, category, brand, keywords } = body;
+    const { name, category, brand, keywords, competitor_brands } = body;
 
     if (!name || !category || !brand) {
       return NextResponse.json(
@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
         category,
         brand,
         keywords: keywords ?? [],
+        competitor_brands: competitor_brands ?? [],
       })
       .select()
       .single();
