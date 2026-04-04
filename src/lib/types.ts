@@ -21,7 +21,9 @@ export type Report = {
   period_start: string;
   category_summary: string;
   brand_summary: string;
-  key_insights: string[];
+  key_insights: string[];          // legacy (kept for backward compat)
+  category_insights: string[];
+  brand_insights: string[];
   raw_sources: RawSource[];
   created_at: string;
 };

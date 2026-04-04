@@ -124,6 +124,7 @@ export async function POST(request: NextRequest) {
 ブランドマネージャーが月曜の朝に読んで今週の意思決定に使えるインサイトを出してください。
 
 以下のカテゴリについて、web検索を使って${periodDesc}してください。
+※ブランド固有の話題は含めないこと。カテゴリ全体の話のみ。
 
 調査基準日: ${periodStart}
 カテゴリ: ${category}${keywordNote}
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
 1. 市場トレンド（数値・成長率を含めること）
 2. 消費者インサイト（なぜそう思うか・動機まで）
 3. 競合動向（具体的なブランド名・施策）
-4. 機会・リスク（ブランドへの示唆）
+4. 機会・リスク（カテゴリ全体への示唆）
 
 日本語で各観点200字程度、合計800字程度の要約を提供してください。重要なポイントは箇条書きも使って整理してください。
 `.trim();
@@ -144,6 +145,7 @@ export async function POST(request: NextRequest) {
 ブランドマネージャーが月曜の朝に読んで今週の意思決定に使えるインサイトを出してください。
 
 以下のブランドについて、web検索を使って${periodDesc}してください。
+※カテゴリ全体の市場動向は含めないこと。このブランドに関する話のみ。
 
 調査基準日: ${periodStart}
 ブランド: ${brand}
@@ -151,10 +153,10 @@ export async function POST(request: NextRequest) {
 
 以下の4つの観点で必ず各観点の発見を出してください：
 
-1. 市場トレンド（数値・成長率を含めること）
-2. 消費者インサイト（なぜそう思うか・動機まで）
-3. 競合動向（具体的なブランド名・施策）
-4. 機会・リスク（ブランドへの示唆）
+1. ブランドの最新動向（数値・キャンペーン・リリース）
+2. 消費者の評判・口コミ（SNS・レビュー、なぜそう思うか・動機まで）
+3. 競合との比較（具体的なブランド名・差別化ポイント）
+4. 機会・リスク（このブランドへの示唆）
 
 日本語で各観点200字程度、合計800字程度の要約を提供してください。重要なポイントは箇条書きも使って整理してください。
 `.trim();
@@ -165,37 +167,58 @@ export async function POST(request: NextRequest) {
       researchWithWebSearch(brandPrompt),
     ]);
 
-    // キーインサイトをカテゴリ要約とブランド要約から合成
-    const insightPrompt = `
-以下の2つの調査結果をもとに、マーケター向けの重要なインサイトを5〜8項目、簡潔な箇条書きでまとめてください。
+    // 3. カテゴリインサイトとブランドインサイトを並列生成
+    const categoryInsightPrompt = `
+以下のカテゴリトレンド調査結果をもとに、カテゴリ全体に関するマーケター向けの重要なインサイトを3〜5項目、簡潔な箇条書きでまとめてください。
 1項目は1〜2文で、具体的かつ実践的な内容にしてください。
+ブランド固有の話題は含めないこと。カテゴリ全体の市場・消費者・競合動向に関する洞察のみ。
 
 【良いインサイトの例】
-- 環境配慮型製品へのシフトが加速しており、詰め替え・濃縮タイプの購買が前年比120%増。ブランドの環境訴求を強化する好機。
-- JOYへのネガティブ言及の60%が「香り」に集中。競合花王キュキュットは無香料ラインを強化中で差別化リスクあり。
-- 20代女性層でTikTok経由の「洗い物ASMR」コンテンツが急増。UGC活用のコンテンツ戦略が有効な可能性。
+- 環境配慮型製品へのシフトが加速しており、詰め替え・濃縮タイプの購買が前年比120%増。カテゴリとして環境訴求が差別化軸になりつつある。
+- 20代女性層でTikTok経由の「洗い物ASMR」コンテンツが急増。カテゴリ全体でUGC活用のコンテンツ戦略が有効な可能性。
 
-【避けるべき悪いインサイトの例】
+【避けるべき悪い例】
 - 食器洗剤市場は成長しています。（数値・示唆がない）
-- JOYは人気があります。（具体性がない）
 
 === カテゴリトレンド ===
 ${categoryResult.summary}
 
-=== ブランドトレンド ===
-${brandResult.summary}
-
 箇条書き形式（行頭に「-」を使用）で出力してください。数値・具体的なブランド名・実践的な示唆を必ず含めてください。
 `.trim();
 
-    const insightResponse = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: insightPrompt }],
-    });
+    const brandInsightPrompt = `
+以下のブランドトレンド調査結果をもとに、このブランドに関するマーケター向けの重要なインサイトを3〜5項目、簡潔な箇条書きでまとめてください。
+1項目は1〜2文で、具体的かつ実践的な内容にしてください。
+カテゴリ全体の市場動向は含めないこと。このブランドに固有の評判・施策・機会・リスクに関する洞察のみ。
 
-    const insightText = extractText(insightResponse.content);
-    const keyInsights = parseInsights(insightText);
+【良いインサイトの例】
+- JOYへのネガティブ言及の60%が「香り」に集中。競合花王キュキュットは無香料ラインを強化中で差別化リスクあり。
+- 20代女性のインフルエンサーによるJOY紹介動画が急増、ブランド認知向上の好機。
+
+【避けるべき悪い例】
+- JOYは人気があります。（具体性がない）
+
+=== ブランドトレンド ===
+${brandResult.summary}
+
+箇条書き形式（行頭に「-」を使用）で出力してください。数値・具体的な施策・実践的な示唆を必ず含めてください。
+`.trim();
+
+    const [categoryInsightResponse, brandInsightResponse] = await Promise.all([
+      anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: categoryInsightPrompt }],
+      }),
+      anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: brandInsightPrompt }],
+      }),
+    ]);
+
+    const categoryInsights = parseInsights(extractText(categoryInsightResponse.content));
+    const brandInsights = parseInsights(extractText(brandInsightResponse.content));
 
     // ソースをマージして重複除去
     const allSources = [
@@ -214,7 +237,9 @@ ${brandResult.summary}
         period_start: periodStart,
         category_summary: categoryResult.summary,
         brand_summary: brandResult.summary,
-        key_insights: keyInsights,
+        key_insights: [],
+        category_insights: categoryInsights,
+        brand_insights: brandInsights,
         raw_sources: allSources,
       })
       .select()
