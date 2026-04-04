@@ -31,7 +31,7 @@ export default function RootLayout({
     >
       <body className="h-full flex">
         <SidebarWrapper />
-        <main className="flex-1 overflow-y-auto bg-slate-50">
+        <main className="flex-1 overflow-y-auto bg-slate-50 pt-14 md:pt-0">
           {children}
         </main>
       </body>

@@ -22,6 +22,7 @@ export default function ProjectDashboard() {
   const [report, setReport] = useState<Report | null>(null);
   const [activePeriod, setActivePeriod] = useState<PeriodType>("weekly");
   const [generating, setGenerating] = useState(false);
+  const [generatingStep, setGeneratingStep] = useState<string | null>(null);
   const [loadingReport, setLoadingReport] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,30 +61,41 @@ export default function ProjectDashboard() {
 
   async function handleGenerate() {
     setGenerating(true);
+    setGeneratingStep("カテゴリトレンドを調査中...");
     setError(null);
+
+    const t1 = setTimeout(() => setGeneratingStep("ブランドトレンドを調査中..."), 10000);
+    const t2 = setTimeout(() => setGeneratingStep("インサイトを生成中..."), 22000);
+
     try {
       const res = await fetch("/api/reports/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_id: id, period_type: activePeriod }),
       });
+      clearTimeout(t1);
+      clearTimeout(t2);
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error ?? "レポート生成に失敗しました");
       }
+      setGeneratingStep("保存中...");
       await fetchReport(activePeriod);
     } catch (err) {
+      clearTimeout(t1);
+      clearTimeout(t2);
       setError(err instanceof Error ? err.message : "エラーが発生しました");
     } finally {
       setGenerating(false);
+      setGeneratingStep(null);
     }
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-8">
           <div>
             {project ? (
               <>
@@ -101,7 +113,7 @@ export default function ProjectDashboard() {
               <div className="h-8 w-64 bg-slate-200 rounded animate-pulse" />
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 self-start">
             <Link
               href={`/projects/${id}/history`}
               className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
@@ -119,7 +131,7 @@ export default function ProjectDashboard() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  調査中...
+                  {generatingStep ?? "調査中..."}
                 </>
               ) : (
                 <>
