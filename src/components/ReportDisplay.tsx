@@ -31,10 +31,18 @@ function InsightTagBadge({ insight }: { insight: string }) {
 
 function prepareMarkdown(text: string): string {
   return text
-    .replace(/^・\s*/gm, "- ")          // Japanese bullet → markdown bullet
-    .replace(/\n{3,}/g, "\n\n")          // collapse 3+ blank lines
+    .replace(/^・\s*/gm, "- ")
+    .replace(/\n{3,}/g, "\n\n")
     .replace(/([^\n])\n(- )/g, "$1\n\n$2")
     .replace(/([^\n])\n(\d+\. )/g, "$1\n\n$2");
+}
+
+function cleanMarkdown(text: string): string {
+  return text
+    .replace(/^(以下、|以下に、|以下は|以上の|上記の|まとめると|以上が|なお、).+(\n|$)/gm, "")
+    .replace(/^[・•]\s*/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 // ─── Period display ───────────────────────────────────────────────────────────
@@ -51,7 +59,6 @@ type ParsedSection = { title: string; bullets: string[] };
 
 function parseSections(text: string): ParsedSection[] | null {
   const normalized = text.replace(/\r\n/g, "\n");
-  // Match lines like "1. 市場トレンド（...）" or "## 市場トレンド"
   const headerRe = /^(?:\d+[.．]\s*|#{1,3}\s*)(.+)$/gm;
   const matches = [...normalized.matchAll(headerRe)];
 
@@ -64,7 +71,7 @@ function parseSections(text: string): ParsedSection[] | null {
     const nextMatch = matches[i + 1];
 
     const title = match[1]
-      .replace(/[（(][^）)]*[）)]/g, "") // strip parenthetical instructions
+      .replace(/[（(][^）)]*[）)]/g, "")
       .replace(/\*+/g, "")
       .trim();
 
@@ -83,35 +90,71 @@ function parseSections(text: string): ParsedSection[] | null {
   return sections.length >= 2 ? sections : null;
 }
 
-// ─── Section card palette ─────────────────────────────────────────────────────
+// ─── Palette types ────────────────────────────────────────────────────────────
 
-const SECTION_PALETTE = [
-  { color: "#1D9E75", lightBg: "bg-emerald-50", textColor: "text-emerald-700" },
-  { color: "#0C447C", lightBg: "bg-blue-50",    textColor: "text-blue-800"   },
-  { color: "#7C3AED", lightBg: "bg-violet-50",  textColor: "text-violet-700" },
-  { color: "#D97706", lightBg: "bg-amber-50",   textColor: "text-amber-700"  },
+type PaletteItem = {
+  color: string;
+  lightBgColor: string;
+  textColor: string;
+};
+
+// ─── Category section palette & icons ─────────────────────────────────────────
+
+const SECTION_PALETTE: PaletteItem[] = [
+  { color: "#1D9E75", lightBgColor: "#f0fdf4", textColor: "text-emerald-700" },
+  { color: "#0C447C", lightBgColor: "#eff6ff", textColor: "text-blue-800"   },
+  { color: "#7C3AED", lightBgColor: "#f5f3ff", textColor: "text-violet-700" },
+  { color: "#D97706", lightBgColor: "#fffbeb", textColor: "text-amber-700"  },
 ];
 
-const SECTION_ICONS = [
-  // 市場トレンド
+const SECTION_ICONS: React.ReactNode[] = [
   <svg key="trend" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
       d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
   </svg>,
-  // 消費者インサイト
   <svg key="consumer" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
       d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>,
-  // 競合動向
   <svg key="competitor" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
       d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
   </svg>,
-  // 機会・リスク
   <svg key="risk" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
       d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+  </svg>,
+];
+
+// ─── Brand section palette & icons ────────────────────────────────────────────
+
+const BRAND_SECTION_PALETTE: PaletteItem[] = [
+  { color: "#1D9E75", lightBgColor: "#f0fdfa", textColor: "text-teal-700"   },
+  { color: "#3b82f6", lightBgColor: "#eff6ff", textColor: "text-blue-700"   },
+  { color: "#f97316", lightBgColor: "#fff7ed", textColor: "text-orange-700" },
+  { color: "#a855f7", lightBgColor: "#faf5ff", textColor: "text-purple-700" },
+];
+
+const BRAND_SECTION_ICONS: React.ReactNode[] = [
+  // ブランドの最新動向 (megaphone)
+  <svg key="megaphone" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+  </svg>,
+  // 消費者の評判・口コミ (chat bubble)
+  <svg key="chat" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+  </svg>,
+  // 競合との比較 (arrows/compare)
+  <svg key="compare" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+  </svg>,
+  // 機会・リスク (target)
+  <svg key="target" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
   </svg>,
 ];
 
@@ -119,13 +162,16 @@ const SECTION_ICONS = [
 
 function SectionCards({
   content,
+  palette = SECTION_PALETTE,
+  icons = SECTION_ICONS,
 }: {
   content: string;
+  palette?: PaletteItem[];
+  icons?: React.ReactNode[];
 }) {
   const sections = parseSections(content);
 
   if (!sections) {
-    // Fallback: clean markdown rendering
     return (
       <div className="text-sm text-slate-600 leading-relaxed">
         <ReactMarkdown
@@ -148,8 +194,8 @@ function SectionCards({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {sections.map(({ title, bullets }, i) => {
-        const palette = SECTION_PALETTE[i % SECTION_PALETTE.length];
-        const icon = SECTION_ICONS[i % SECTION_ICONS.length];
+        const p = palette[i % palette.length];
+        const icon = icons[i % icons.length];
 
         return (
           <div
@@ -158,13 +204,14 @@ function SectionCards({
           >
             {/* Card header */}
             <div
-              className={`flex items-center gap-2 px-4 py-3 ${palette.lightBg}`}
-              style={{ borderBottom: `2px solid ${palette.color}20` }}
+              className="flex items-center gap-2 px-4 py-3"
+              style={{
+                backgroundColor: p.lightBgColor,
+                borderBottom: `2px solid ${p.color}30`,
+              }}
             >
-              <span style={{ color: palette.color }}>{icon}</span>
-              <span
-                className={`text-xs font-bold tracking-wide ${palette.textColor}`}
-              >
+              <span style={{ color: p.color }}>{icon}</span>
+              <span className={`text-xs font-bold tracking-wide ${p.textColor}`}>
                 {title}
               </span>
             </div>
@@ -174,9 +221,9 @@ function SectionCards({
               {bullets.map((bullet, j) => (
                 <div key={j} className="flex items-start gap-2.5">
                   <div
-                    className="w-0.5 rounded-full shrink-0 mt-1"
+                    className="w-0.5 rounded-full shrink-0"
                     style={{
-                      backgroundColor: palette.color,
+                      backgroundColor: p.color,
                       alignSelf: "stretch",
                       minHeight: "14px",
                     }}
@@ -192,18 +239,22 @@ function SectionCards({
   );
 }
 
-// ─── Summary block (label + section cards) ────────────────────────────────────
+// ─── Summary block (collapsible header + section cards) ───────────────────────
 
 function SummaryBlock({
   title,
   content,
   accentColor,
   icon,
+  sectionPalette,
+  sectionIcons,
 }: {
   title: string;
   content: string;
   accentColor: string;
   icon: React.ReactNode;
+  sectionPalette?: PaletteItem[];
+  sectionIcons?: React.ReactNode[];
 }) {
   const [open, setOpen] = useState(true);
 
@@ -230,7 +281,13 @@ function SummaryBlock({
         </svg>
       </button>
 
-      {open && <SectionCards content={content} />}
+      {open && (
+        <SectionCards
+          content={content}
+          palette={sectionPalette}
+          icons={sectionIcons}
+        />
+      )}
     </div>
   );
 }
@@ -465,21 +522,25 @@ export default function ReportDisplay({ report, periodLabel }: { report: Report;
                 d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
             </svg>
           }
+          sectionPalette={SECTION_PALETTE}
+          sectionIcons={SECTION_ICONS}
         />
       )}
 
-      {/* 4. Brand detail — section cards */}
+      {/* 4. Brand detail — brand-specific 4-card layout */}
       {report.brand_summary && (
         <SummaryBlock
           title="ブランドトレンド詳細"
-          content={report.brand_summary}
+          content={cleanMarkdown(report.brand_summary)}
           accentColor="#0C447C"
           icon={
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z" />
+                d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
             </svg>
           }
+          sectionPalette={BRAND_SECTION_PALETTE}
+          sectionIcons={BRAND_SECTION_ICONS}
         />
       )}
 

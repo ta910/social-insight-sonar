@@ -365,14 +365,35 @@ export default function ProjectDashboard() {
                       </option>
                     ))}
                   </select>
-                  {project?.auto_generate && (
-                    <div className="flex items-center gap-1.5 ml-1">
-                      <span className="text-xs font-medium text-emerald-600">✓ 毎月自動生成 ON</span>
-                      <Link href={`/projects/${id}/edit`} className="text-xs text-slate-400 hover:underline">
-                        プロジェクト設定で変更
-                      </Link>
-                    </div>
-                  )}
+                </div>
+              )}
+
+              {/* Auto generate status — always visible once project loaded */}
+              {project && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                  <div
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      background: project.auto_generate ? "#22c55e" : "#d1d5db",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontSize: "13px",
+                      color: project.auto_generate ? "#16a34a" : "#6b7280",
+                      fontWeight: project.auto_generate ? 500 : 400,
+                    }}
+                  >
+                    {project.auto_generate ? "毎月自動生成 ON" : "毎月自動生成 OFF"}
+                  </span>
+                  <Link
+                    href={`/projects/${id}/edit`}
+                    style={{ fontSize: "11px", color: "#9ca3af", textDecoration: "underline" }}
+                  >
+                    設定を変更
+                  </Link>
                 </div>
               )}
             </div>
