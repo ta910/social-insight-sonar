@@ -16,6 +16,7 @@ export default function EditProjectPage() {
   const [form, setForm] = useState({ name: "", category: "", brand: "", keywords: "" });
   const [competitors, setCompetitors] = useState<string[]>([]);
   const [competitorInput, setCompetitorInput] = useState("");
+  const [autoGenerate, setAutoGenerate] = useState(false);
 
   useEffect(() => {
     async function fetchProject() {
@@ -31,6 +32,7 @@ export default function EditProjectPage() {
           keywords: (p.keywords ?? []).join(", "),
         });
         setCompetitors(p.competitor_brands ?? []);
+        setAutoGenerate(p.auto_generate ?? false);
       } catch (err) {
         setError(err instanceof Error ? err.message : "エラーが発生しました");
       } finally {
@@ -77,6 +79,7 @@ export default function EditProjectPage() {
           brand: form.brand,
           keywords: form.keywords.split(",").map((k) => k.trim()).filter(Boolean),
           competitor_brands: competitors,
+          auto_generate: autoGenerate,
         }),
       });
 
@@ -243,9 +246,32 @@ export default function EditProjectPage() {
                       />
                     )}
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Enter またはカンマで追加（最大3件）
-                  </p>
+                  <p className="text-xs text-slate-400 mt-1">Enter またはカンマで追加（最大3件）</p>
+                </div>
+
+                {/* Auto Generate Toggle */}
+                <div className="flex items-center justify-between py-3 border-t border-slate-100">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">毎月自動生成</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      毎月1日に前月分のレポートを自動生成します
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAutoGenerate((v) => !v)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sis-cyan focus:ring-offset-2 ${
+                      autoGenerate ? "bg-sis-cyan-dark" : "bg-slate-200"
+                    }`}
+                    role="switch"
+                    aria-checked={autoGenerate}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        autoGenerate ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
                 </div>
 
                 {/* Error */}

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { getServerUser } from "@/lib/supabase-server";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,6 +16,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const user = await getServerUser();
+
     const { data, error } = await supabase
       .from("projects")
       .insert({
@@ -23,6 +26,8 @@ export async function POST(request: NextRequest) {
         brand,
         keywords: keywords ?? [],
         competitor_brands: competitor_brands ?? [],
+        auto_generate: false,
+        owner_email: user?.email ?? null,
       })
       .select()
       .single();
@@ -70,7 +75,7 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, category, brand, keywords, competitor_brands } = body;
+    const { name, category, brand, keywords, competitor_brands, auto_generate } = body;
 
     if (!name || !category || !brand) {
       return NextResponse.json(
@@ -87,6 +92,7 @@ export async function PATCH(request: NextRequest) {
         brand,
         keywords: keywords ?? [],
         competitor_brands: competitor_brands ?? [],
+        auto_generate: auto_generate ?? false,
       })
       .eq("id", id)
       .select()

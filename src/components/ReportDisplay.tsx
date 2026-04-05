@@ -32,11 +32,12 @@ function InsightTagBadge({ insight }: { insight: string }) {
   );
 }
 
-// --- Markdown preprocessing: ensure blank line before bullet lists ---
+// --- Markdown preprocessing ---
 function prepareMarkdown(text: string): string {
   return text
-    .replace(/([^\n])\n(- )/g, "$1\n\n$2")
-    .replace(/([^\n])\n(\d+\. )/g, "$1\n\n$2");
+    .replace(/\n{3,}/g, "\n\n")          // normalize 3+ newlines to 2
+    .replace(/([^\n])\n(- )/g, "$1\n\n$2")   // ensure blank line before bullet
+    .replace(/([^\n])\n(\d+\. )/g, "$1\n\n$2"); // ensure blank line before numbered list
 }
 
 // --- Period display helper ---
@@ -123,8 +124,34 @@ function SummaryAccordion({
       </button>
       <div className="px-6 pb-5">
         {open ? (
-          <div className="text-sm text-slate-600 leading-relaxed prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_p]:mb-2 [&_strong]:font-semibold [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_li]:leading-relaxed">
-            <ReactMarkdown>{prepareMarkdown(content)}</ReactMarkdown>
+          <div className="text-sm text-slate-600 leading-relaxed">
+            <ReactMarkdown
+              components={{
+                ul: ({ children }) => (
+                  <ul className="list-disc pl-5 space-y-1 my-2">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="list-decimal pl-5 space-y-1 my-2">{children}</ol>
+                ),
+                li: ({ children }) => (
+                  <li className="leading-relaxed">{children}</li>
+                ),
+                p: ({ children }) => (
+                  <p className="mb-2 last:mb-0">{children}</p>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold text-slate-800">{children}</strong>
+                ),
+                h2: ({ children }) => (
+                  <h2 className="font-semibold text-slate-800 mt-3 mb-1">{children}</h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 className="font-semibold text-slate-700 mt-2 mb-1">{children}</h3>
+                ),
+              }}
+            >
+              {prepareMarkdown(content)}
+            </ReactMarkdown>
           </div>
         ) : (
           <p className="text-sm text-slate-500 leading-relaxed">{preview}</p>

@@ -61,6 +61,9 @@ function parseInsights(text: string): string[] {
   return text
     .split("\n")
     .map((line) => line.replace(/^[-•*\d.]\s*/, "").trim())
+    // Remove heading lines (##, ###, etc.) and boilerplate openers
+    .filter((line) => !/^#{1,6}\s/.test(line))
+    .filter((line) => !/^(以下、|以上の|以下は|まとめ|総括|なお、)/.test(line))
     .filter((line) => line.length > 20)
     .slice(0, 8);
 }
@@ -208,6 +211,13 @@ ${expertIntro}
 `.trim()
     );
 
+    const insightRules = `
+出力ルール：
+- 行頭は必ず「-」のみ。それ以外の形式は使わないこと。
+- 「## カテゴリインサイト」「### 〇〇」などの見出し・タイトル行は一切含めないこと。
+- 「以下、」「以下は」「以上の調査結果を踏まえ」「まとめ」などの書き出し・締め文は含めないこと。
+- 最初の行から直接インサイト本文を書き始めること。`.trim();
+
     const categoryInsightPrompt = `
 以下のカテゴリトレンド調査結果をもとに、カテゴリ全体に関するマーケター向けの重要なインサイトを3〜5項目、簡潔な箇条書きでまとめてください。
 1項目は1〜2文で、具体的かつ実践的な内容にしてください。
@@ -220,7 +230,8 @@ ${expertIntro}
 === カテゴリトレンド ===
 ${categoryResult.summary}
 
-箇条書き形式（行頭に「-」を使用）で出力してください。数値・具体的なブランド名・実践的な示唆を必ず含めてください。
+${insightRules}
+数値・具体的なブランド名・実践的な示唆を必ず含めてください。
 `.trim();
 
     const brandInsightPrompt = `
@@ -235,7 +246,8 @@ ${categoryResult.summary}
 === ブランドトレンド ===
 ${brandResult.summary}
 
-箇条書き形式（行頭に「-」を使用）で出力してください。数値・具体的な施策・実践的な示唆を必ず含めてください。
+${insightRules}
+数値・具体的な施策・実践的な示唆を必ず含めてください。
 `.trim();
 
     // Phase 2: insights + competitor research in parallel
