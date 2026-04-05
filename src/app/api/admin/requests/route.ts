@@ -88,7 +88,14 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: "リンク生成に失敗しました" }, { status: 500 });
       }
 
-      const actionLink = linkData.properties.action_link;
+      // Use hashed_token directly — bypass action_link (which uses implicit flow
+      // with tokens in URL hash that server-side middleware cannot read).
+      // Instead, route through /auth/confirm which calls verifyOtp server-side
+      // and sets the session in cookies properly.
+      const tokenHash = linkData.properties.hashed_token;
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ?? "https://social-insight-sonar.vercel.app";
+      const confirmUrl = `${siteUrl}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=recovery&next=/auth/update-password`;
 
       // Send welcome email via Resend
       await sendEmail({
@@ -100,7 +107,7 @@ export async function PATCH(request: NextRequest) {
             <p>Social Insight Sonar のアカウントが承認されました。</p>
             <p>以下のボタンからパスワードを設定してください。</p>
             <p style="margin: 24px 0;">
-              <a href="${actionLink}"
+              <a href="${confirmUrl}"
                  style="background:#0C447C;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">
                 パスワードを設定する
               </a>
