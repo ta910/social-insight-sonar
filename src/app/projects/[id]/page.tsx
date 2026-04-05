@@ -361,10 +361,18 @@ export default function ProjectDashboard() {
                   >
                     {monthlyReports.map((r) => (
                       <option key={r.id} value={r.id}>
-                        {formatPeriodStart(r.period_start)} 生成
+                        {formatPeriodStart(r.period_start)}
                       </option>
                     ))}
                   </select>
+                  {project?.auto_generate && (
+                    <div className="flex items-center gap-1.5 ml-1">
+                      <span className="text-xs font-medium text-emerald-600">✓ 毎月自動生成 ON</span>
+                      <Link href={`/projects/${id}/edit`} className="text-xs text-slate-400 hover:underline">
+                        プロジェクト設定で変更
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

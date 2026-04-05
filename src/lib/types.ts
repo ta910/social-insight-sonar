@@ -5,6 +5,8 @@ export type Project = {
   brand: string;
   keywords: string[];
   competitor_brands: string[];
+  auto_generate: boolean;
+  owner_email: string | null;
   created_at: string;
 };
 

@@ -2,11 +2,19 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 
 const Sidebar = dynamic(() => import("./Sidebar"), { ssr: false });
 
+// These paths are shown without a sidebar
+const NO_SIDEBAR_PREFIXES = ["/login", "/signup-request", "/auth/"];
+
 export default function SidebarWrapper() {
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+
+  const hideSidebar = NO_SIDEBAR_PREFIXES.some((p) => pathname.startsWith(p));
+  if (hideSidebar) return null;
 
   return (
     <>
