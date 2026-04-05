@@ -4,19 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import ReportDisplay from "@/components/ReportDisplay";
-import type { Report, PeriodType } from "@/lib/types";
+import type { Report } from "@/lib/types";
 
-const PERIOD_LABELS: Record<PeriodType, string> = {
-  weekly: "週次",
-  monthly: "月次",
-  yearly: "年次",
-};
-
-const PERIOD_COLORS: Record<PeriodType, string> = {
-  weekly: "bg-cyan-50 text-sis-cyan-dark",
-  monthly: "bg-purple-50 text-purple-600",
-  yearly: "bg-amber-50 text-amber-600",
-};
+function formatPeriodMonth(dateStr: string): string {
+  const parts = dateStr.split("-");
+  if (parts.length >= 2) return `${parseInt(parts[0])}年${parseInt(parts[1])}月`;
+  return dateStr;
+}
 
 export default function HistoryPage() {
   const params = useParams();
@@ -25,6 +19,7 @@ export default function HistoryPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchAll() {
@@ -39,6 +34,25 @@ export default function HistoryPage() {
     }
     fetchAll();
   }, [id]);
+
+  async function handleDelete(reportId: string) {
+    const confirmed = window.confirm("このレポートを削除しますか？");
+    if (!confirmed) return;
+
+    setDeletingId(reportId);
+    try {
+      const res = await fetch(`/api/reports/${reportId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error ?? "削除に失敗しました");
+        return;
+      }
+      setReports((prev) => prev.filter((r) => r.id !== reportId));
+      if (expanded === reportId) setExpanded(null);
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div className="p-8">
@@ -88,46 +102,57 @@ export default function HistoryPage() {
           <div className="space-y-4">
             {reports.map((report) => {
               const isOpen = expanded === report.id;
+              const isDeleting = deletingId === report.id;
               return (
                 <div
                   key={report.id}
                   className="bg-white rounded-xl border border-slate-200 overflow-hidden"
                 >
                   {/* Summary row */}
-                  <button
-                    onClick={() => setExpanded(isOpen ? null : report.id)}
-                    className="w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                          PERIOD_COLORS[report.period_type]
-                        }`}
-                      >
-                        {PERIOD_LABELS[report.period_type]}
-                      </span>
+                  <div className="flex items-center justify-between px-6 py-4">
+                    <button
+                      onClick={() => setExpanded(isOpen ? null : report.id)}
+                      className="flex items-center gap-3 flex-1 text-left"
+                    >
                       <span className="text-sm font-medium text-slate-700">
-                        {new Date(report.period_start).toLocaleDateString("ja-JP")} 〜
+                        {formatPeriodMonth(report.period_start)}
                       </span>
                       <span className="text-xs text-slate-400">
                         生成: {new Date(report.created_at).toLocaleDateString("ja-JP")}
                       </span>
-                    </div>
-                    <svg
-                      className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                      <svg
+                        className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(report.id)}
+                      disabled={isDeleting}
+                      className="ml-3 w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      title="このレポートを削除"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
+                      {isDeleting ? (
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
 
                   {/* Expanded detail */}
                   {isOpen && (
                     <div className="px-6 pb-6 border-t border-slate-100">
                       <div className="pt-5">
-                        <ReportDisplay report={report} periodLabel={report.period_type === "weekly" ? "週次" : report.period_type === "monthly" ? "月次" : "年次"} />
+                        <ReportDisplay report={report} periodLabel="月次" />
                       </div>
                     </div>
                   )}
