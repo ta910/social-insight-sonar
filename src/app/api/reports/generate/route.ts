@@ -68,11 +68,11 @@ function parseInsights(text: string): string[] {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { project_id, period_type, period_start: periodStartInput } = body;
+    const { project_id, selectedYear, selectedMonth } = body;
 
-    if (!project_id || !period_type) {
+    if (!project_id) {
       return NextResponse.json(
-        { error: "project_id と period_type は必須です" },
+        { error: "project_id は必須です" },
         { status: 400 }
       );
     }
@@ -93,14 +93,36 @@ export async function POST(request: NextRequest) {
     const { category, brand, keywords, competitor_brands } = project;
     const keywordNote =
       keywords?.length > 0 ? `（関連キーワード: ${keywords.join(", ")}）` : "";
-    const periodStart = periodStartInput ?? new Date().toISOString().split("T")[0];
 
-    const periodLabel: Record<string, string> = {
-      weekly: "過去1週間（直近7日間）のトレンドを調査",
-      monthly: "過去1ヶ月間のトレンドを調査",
-      yearly: "過去1年間のトレンドを調査",
-    };
-    const periodDesc = periodLabel[period_type] ?? "最新のトレンドを調査";
+    // Always monthly. Derive period_start from selectedYear/selectedMonth.
+    const period_type = "monthly";
+    let year: number;
+    let month: number;
+    if (selectedYear && selectedMonth) {
+      year = Number(selectedYear);
+      month = Number(selectedMonth);
+    } else {
+      const prev = new Date();
+      prev.setMonth(prev.getMonth() - 1);
+      year = prev.getFullYear();
+      month = prev.getMonth() + 1;
+    }
+    const periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
+    const displayMonth = `${year}年${month}月`;
+    const periodDesc = `${displayMonth}のトレンドを調査`;
+
+    const noPreamble = `
+以下のような前置き文を生成しないこと：
+・〇〇インサイトレポートのようなタイトル行
+・調査基準日・対象期間の行
+・P&G・ユニリーバ・花王での〜のような行
+・以上の調査結果を踏まえ〜のような書き出し
+本文の内容から直接始めること。箇条書きは必ず「-」で統一すること。`.trim();
+
+    const periodScope = `
+調査対象期間は${displayMonth}の1ヶ月間です。
+この期間に公開された記事・ニュース・SNSの情報のみを参考にすること。
+それ以外の期間の情報は含めないこと。`.trim();
 
     const expertIntro = `あなたはP&G・ユニリーバ・花王でブランドマネージャーを10年以上務めたマーケティングの専門家です。
 ブランドマネージャーが月曜の朝に読んで今週の意思決定に使えるインサイトを出してください。`;
@@ -108,10 +130,11 @@ export async function POST(request: NextRequest) {
     const categoryPrompt = `
 ${expertIntro}
 
+${periodScope}
+
 以下のカテゴリについて、web検索を使って${periodDesc}してください。
 ※ブランド固有の話題は含めないこと。カテゴリ全体の話のみ。
 
-調査基準日: ${periodStart}
 カテゴリ: ${category}${keywordNote}
 
 以下の4つの観点で必ず各観点の発見を出してください：
@@ -121,16 +144,18 @@ ${expertIntro}
 3. 競合動向（具体的なブランド名・施策）
 4. 機会・リスク（カテゴリ全体への示唆）
 
-日本語で各観点200字程度、合計800字程度の要約を提供してください。重要なポイントは箇条書きも使って整理してください。
+日本語で各観点200字程度、合計800字程度の要約を提供してください。重要なポイントは「-」で始まる箇条書きで整理してください。
+${noPreamble}
 `.trim();
 
     const brandPrompt = `
 ${expertIntro}
 
+${periodScope}
+
 以下のブランドについて、web検索を使って${periodDesc}してください。
 ※カテゴリ全体の市場動向は含めないこと。このブランドに関する話のみ。
 
-調査基準日: ${periodStart}
 ブランド: ${brand}
 カテゴリ: ${category}${keywordNote}
 
@@ -141,7 +166,8 @@ ${expertIntro}
 3. 競合との比較（具体的なブランド名・差別化ポイント）
 4. 機会・リスク（このブランドへの示唆）
 
-日本語で各観点200字程度、合計800字程度の要約を提供してください。重要なポイントは箇条書きも使って整理してください。
+日本語で各観点200字程度、合計800字程度の要約を提供してください。重要なポイントは「-」で始まる箇条書きで整理してください。
+${noPreamble}
 `.trim();
 
     // Phase 1: research + previous report lookup in parallel

@@ -4,63 +4,121 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import ReportDisplay from "@/components/ReportDisplay";
-import type { Project, Report, PeriodType } from "@/lib/types";
+import type { Project, Report } from "@/lib/types";
 
-const PERIOD_LABELS: Record<PeriodType, string> = {
-  weekly: "週次",
-  monthly: "月次",
-  yearly: "年次",
-};
+type ActiveTab = "weekly" | "monthly";
 
-const PERIODS: PeriodType[] = ["weekly", "monthly", "yearly"];
-
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+function getPrevMonth(): { year: number; month: number } {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
+
+function formatYearMonth(year: number, month: number) {
+  return `${year}年${month}月`;
+}
+
+function formatPeriodStart(dateStr: string) {
+  const parts = dateStr.split("-");
+  if (parts.length >= 2) return `${parseInt(parts[0])}年${parseInt(parts[1])}月`;
+  return dateStr;
+}
+
+// --- Weekly placeholder ---
+const MOCK_BARS = [40, 65, 45, 80, 55, 90, 70, 60, 85, 50, 75, 95, 65, 45];
+const DAYS = ["月", "火", "水", "木", "金", "土", "日"];
+
+function WeeklyPlaceholder() {
+  return (
+    <div className="space-y-5">
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
+        <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+        <h3 className="font-semibold text-slate-600 mb-2">近日公開予定</h3>
+        <p className="text-sm text-slate-400 leading-relaxed">
+          X（旧Twitter）のツイート数・Google検索数のトレンドグラフと<br />
+          その週の特徴的な記事・ツイートが表示されます
+        </p>
+      </div>
+
+      {/* Mock graph */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6 opacity-40 pointer-events-none select-none">
+        <div className="flex items-center justify-between mb-5">
+          <div className="h-3.5 w-32 bg-slate-200 rounded" />
+          <div className="h-3 w-20 bg-slate-100 rounded" />
+        </div>
+        <div className="flex items-end gap-1.5 h-28 mb-3">
+          {MOCK_BARS.map((h, i) => (
+            <div
+              key={i}
+              className="flex-1 bg-slate-200 rounded-t"
+              style={{ height: `${h}%` }}
+            />
+          ))}
+        </div>
+        <div className="grid grid-cols-7 text-center">
+          {DAYS.map((d) => (
+            <span key={d} className="text-xs text-slate-300">{d}</span>
+          ))}
+        </div>
+        <div className="mt-5 space-y-2">
+          {[80, 65, 50].map((w, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-slate-200 shrink-0" />
+              <div className="h-2.5 bg-slate-100 rounded" style={{ width: `${w}%` }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Main dashboard ---
 
 export default function ProjectDashboard() {
   const params = useParams();
   const id = params.id as string;
 
   const [project, setProject] = useState<Project | null>(null);
-  const [periodReports, setPeriodReports] = useState<Report[]>([]);
+  const [monthlyReports, setMonthlyReports] = useState<Report[]>([]);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
-  const [activePeriod, setActivePeriod] = useState<PeriodType>("weekly");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("monthly");
   const [generating, setGenerating] = useState(false);
   const [generatingStep, setGeneratingStep] = useState<string | null>(null);
   const [loadingReports, setLoadingReports] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [reportDate, setReportDate] = useState(
-    () => new Date().toISOString().split("T")[0]
-  );
 
-  const selectedReport = periodReports.find((r) => r.id === selectedReportId) ?? null;
+  // Year/month picker state (default: previous month)
+  const prev = getPrevMonth();
+  const [selectedYear, setSelectedYear] = useState(prev.year);
+  const [selectedMonth, setSelectedMonth] = useState(prev.month);
 
-  const fetchPeriodReports = useCallback(
-    async (period: PeriodType) => {
-      setLoadingReports(true);
-      setError(null);
-      try {
-        const res = await fetch(
-          `/api/reports?project_id=${id}&period=${period}&all=true`
-        );
-        if (!res.ok) throw new Error("レポートの取得に失敗しました");
-        const data = await res.json();
-        const reports: Report[] = data.reports ?? [];
-        setPeriodReports(reports);
-        setSelectedReportId(reports.length > 0 ? reports[0].id : null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "エラーが発生しました");
-      } finally {
-        setLoadingReports(false);
-      }
-    },
-    [id]
-  );
+  const selectedReport = monthlyReports.find((r) => r.id === selectedReportId) ?? null;
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [currentYear - 1, currentYear];
+  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  const fetchMonthlyReports = useCallback(async () => {
+    setLoadingReports(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/reports?project_id=${id}&period=monthly&all=true`);
+      if (!res.ok) throw new Error("レポートの取得に失敗しました");
+      const data = await res.json();
+      const reports: Report[] = data.reports ?? [];
+      setMonthlyReports(reports);
+      setSelectedReportId(reports.length > 0 ? reports[0].id : null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "エラーが発生しました");
+    } finally {
+      setLoadingReports(false);
+    }
+  }, [id]);
 
   useEffect(() => {
     async function fetchProject() {
@@ -77,8 +135,8 @@ export default function ProjectDashboard() {
   }, [id]);
 
   useEffect(() => {
-    fetchPeriodReports(activePeriod);
-  }, [activePeriod, fetchPeriodReports]);
+    fetchMonthlyReports();
+  }, [fetchMonthlyReports]);
 
   async function handleGenerate() {
     setGenerating(true);
@@ -91,14 +149,11 @@ export default function ProjectDashboard() {
     const timers = [
       setTimeout(() => setGeneratingStep("ブランドトレンドを調査中..."), 10000),
       setTimeout(
-        () =>
-          setGeneratingStep(
-            hasCompetitors ? "競合ブランドを調査中..." : "インサイトを生成中..."
-          ),
+        () => setGeneratingStep(hasCompetitors ? "競合ブランドを調査中..." : "インサイトを生成中..."),
         22000
       ),
       setTimeout(() => setGeneratingStep("インサイトを生成中..."), 38000),
-      setTimeout(() => setGeneratingStep("前回との比較を分析中..."), 55000),
+      setTimeout(() => setGeneratingStep("前月との比較を分析中..."), 55000),
     ];
 
     try {
@@ -107,8 +162,8 @@ export default function ProjectDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           project_id: id,
-          period_type: activePeriod,
-          period_start: reportDate,
+          selectedYear,
+          selectedMonth,
         }),
       });
       timers.forEach(clearTimeout);
@@ -118,7 +173,7 @@ export default function ProjectDashboard() {
       }
       setGeneratingStep("保存中...");
       const { report } = await res.json();
-      await fetchPeriodReports(activePeriod);
+      await fetchMonthlyReports();
       setSelectedReportId(report.id);
     } catch (err) {
       timers.forEach(clearTimeout);
@@ -132,158 +187,177 @@ export default function ProjectDashboard() {
   return (
     <div className="p-4 md:p-8">
       <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6">
-          <div>
-            {project ? (
-              <>
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="text-xs font-medium text-sis-cyan-dark bg-cyan-50 px-2.5 py-0.5 rounded-full">
-                    {project.category}
-                  </span>
-                  <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                    {project.brand}
-                  </span>
-                  {project.competitor_brands?.map((c) => (
-                    <span
-                      key={c}
-                      className="text-xs font-medium text-purple-600 bg-purple-50 px-2.5 py-0.5 rounded-full"
-                    >
-                      競合: {c}
-                    </span>
-                  ))}
-                </div>
-                <h1 className="text-2xl font-bold text-sis-navy">{project.name}</h1>
-              </>
-            ) : (
-              <div className="h-8 w-64 bg-slate-200 rounded animate-pulse" />
-            )}
-          </div>
 
-          {/* Generate controls */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 self-start">
-            <Link
-              href={`/projects/${id}/history`}
-              className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              過去レポート
-            </Link>
-            <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={reportDate}
-                onChange={(e) => setReportDate(e.target.value)}
-                disabled={generating}
-                className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sis-cyan focus:border-transparent disabled:opacity-50 bg-white"
-              />
-              <button
-                onClick={handleGenerate}
-                disabled={generating}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-sis-navy text-white text-sm font-semibold rounded-lg hover:bg-sis-navy-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-              >
-                {generating ? (
-                  <>
-                    <svg className="w-4 h-4 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    <span className="truncate max-w-[160px]">{generatingStep ?? "調査中..."}</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    レポート生成
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
+        {/* Project header */}
+        <div className="mb-6">
+          {project ? (
+            <>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-xs font-medium text-sis-cyan-dark bg-cyan-50 px-2.5 py-0.5 rounded-full">
+                  {project.category}
+                </span>
+                <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                  {project.brand}
+                </span>
+                {project.competitor_brands?.map((c) => (
+                  <span key={c} className="text-xs font-medium text-purple-600 bg-purple-50 px-2.5 py-0.5 rounded-full">
+                    競合: {c}
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold text-sis-navy">{project.name}</h1>
+                <Link
+                  href={`/projects/${id}/history`}
+                  className="text-sm font-medium text-slate-500 hover:text-slate-700 underline underline-offset-2 transition-colors"
+                >
+                  過去レポート一覧
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className="h-8 w-64 bg-slate-200 rounded animate-pulse" />
+          )}
         </div>
 
-        {/* Period Tabs */}
-        <div className="flex border-b border-slate-200 mb-4">
-          {PERIODS.map((period) => (
+        {/* Tabs */}
+        <div className="flex border-b border-slate-200 mb-6">
+          {(["weekly", "monthly"] as ActiveTab[]).map((tab) => (
             <button
-              key={period}
-              onClick={() => setActivePeriod(period)}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
               className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
-                activePeriod === period
+                activeTab === tab
                   ? "border-sis-cyan text-sis-cyan-dark"
                   : "border-transparent text-slate-500 hover:text-slate-700"
               }`}
             >
-              {PERIOD_LABELS[period]}
+              {tab === "weekly" ? "週次トレンド" : "月次レポート"}
             </button>
           ))}
         </div>
 
-        {/* Report selector dropdown */}
-        {!loadingReports && periodReports.length > 0 && (
-          <div className="flex items-center gap-3 mb-5">
-            <span className="text-xs text-slate-500 shrink-0">閲覧中のレポート:</span>
-            <select
-              value={selectedReportId ?? ""}
-              onChange={(e) => setSelectedReportId(e.target.value)}
-              className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sis-cyan bg-white text-slate-700"
-            >
-              {periodReports.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {formatDate(r.period_start)} 生成
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Weekly tab */}
+        {activeTab === "weekly" && <WeeklyPlaceholder />}
 
-        {/* Error */}
-        {error && (
-          <div className="flex items-center gap-2 p-4 mb-5 bg-red-50 border border-red-200 rounded-lg">
-            <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
-        )}
-
-        {/* Report Content */}
-        {loadingReports ? (
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl border border-slate-200 p-6">
-                <div className="h-4 w-32 bg-slate-200 rounded animate-pulse mb-4" />
-                <div className="space-y-2">
-                  <div className="h-3 bg-slate-100 rounded animate-pulse" />
-                  <div className="h-3 bg-slate-100 rounded animate-pulse w-5/6" />
-                  <div className="h-3 bg-slate-100 rounded animate-pulse w-4/6" />
-                </div>
+        {/* Monthly tab */}
+        {activeTab === "monthly" && (
+          <>
+            {/* Controls */}
+            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-5 space-y-3">
+              {/* Year/month selector + generate */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-slate-500">対象月：</span>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  disabled={generating}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sis-cyan bg-white disabled:opacity-50"
+                >
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>{y}年</option>
+                  ))}
+                </select>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  disabled={generating}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sis-cyan bg-white disabled:opacity-50"
+                >
+                  {monthOptions.map((m) => (
+                    <option key={m} value={m}>{m}月</option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  className="inline-flex items-center gap-2 px-5 py-1.5 bg-sis-navy text-white text-sm font-semibold rounded-lg hover:bg-sis-navy-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generating ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span className="max-w-[180px] truncate">{generatingStep ?? "調査中..."}</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      {formatYearMonth(selectedYear, selectedMonth)}のレポートを生成
+                    </>
+                  )}
+                </button>
               </div>
-            ))}
-          </div>
-        ) : selectedReport ? (
-          <ReportDisplay report={selectedReport} periodLabel={PERIOD_LABELS[activePeriod]} />
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-xl border border-dashed border-slate-300">
-            <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-              <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+
+              {/* Report selector dropdown */}
+              {!loadingReports && monthlyReports.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                  <span className="text-xs text-slate-500 shrink-0">閲覧中：</span>
+                  <select
+                    value={selectedReportId ?? ""}
+                    onChange={(e) => setSelectedReportId(e.target.value)}
+                    className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sis-cyan bg-white text-slate-700"
+                  >
+                    {monthlyReports.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {formatPeriodStart(r.period_start)} 生成
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
-            <p className="text-slate-600 font-medium mb-2">
-              {PERIOD_LABELS[activePeriod]}レポートがありません
-            </p>
-            <p className="text-sm text-slate-400 mb-5">
-              日付を選択して「レポート生成」ボタンで調査します
-            </p>
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className="px-5 py-2 bg-sis-navy text-white text-sm font-semibold rounded-lg hover:bg-sis-navy-muted transition-colors disabled:opacity-50"
-            >
-              {generating ? generatingStep ?? "調査中..." : "今すぐ生成"}
-            </button>
-          </div>
+
+            {/* Error */}
+            {error && (
+              <div className="flex items-center gap-2 p-4 mb-5 bg-red-50 border border-red-200 rounded-lg">
+                <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
+            {/* Report content */}
+            {loadingReports ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-xl border border-slate-200 p-6">
+                    <div className="h-4 w-32 bg-slate-200 rounded animate-pulse mb-4" />
+                    <div className="space-y-2">
+                      <div className="h-3 bg-slate-100 rounded animate-pulse" />
+                      <div className="h-3 bg-slate-100 rounded animate-pulse w-5/6" />
+                      <div className="h-3 bg-slate-100 rounded animate-pulse w-4/6" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : selectedReport ? (
+              <ReportDisplay report={selectedReport} periodLabel="月次" />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-xl border border-dashed border-slate-300">
+                <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                  <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p className="text-slate-600 font-medium mb-2">月次レポートがありません</p>
+                <p className="text-sm text-slate-400 mb-5">
+                  対象月を選択して「レポートを生成」してください
+                </p>
+                <button
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  className="px-5 py-2 bg-sis-navy text-white text-sm font-semibold rounded-lg hover:bg-sis-navy-muted transition-colors disabled:opacity-50"
+                >
+                  {generating ? generatingStep ?? "調査中..." : "今すぐ生成"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
